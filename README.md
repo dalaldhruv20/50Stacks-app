@@ -1,9 +1,9 @@
-# 50Stacks 🚀  
+# CIFRAA 🚀  
 ### Mutual Fund Analytics & Insights Platform
 
-**50Stacks** is a modern, data-driven web platform designed to help users **analyze, compare, and understand Indian mutual funds** with clarity and confidence.
+**CIFRAA** is a modern, data-driven web platform designed to help users **analyze, compare, and understand Indian mutual funds** with clarity and confidence.
 
-By transforming complex financial data into **clean visuals and actionable insights**, 50Stacks makes mutual fund analysis accessible for learners, investors, and finance enthusiasts alike.
+By transforming complex financial data into **clean visuals and actionable insights**, CIFRAA makes mutual fund analysis accessible for learners, investors, and finance enthusiasts alike.
 
 ---
 
