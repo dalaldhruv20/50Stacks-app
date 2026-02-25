@@ -19,7 +19,7 @@ By transforming complex financial data into **clean visuals and actionable insig
 
 ## 🛠️ Tech Stack
 
-FUNDEX is built using a modern frontend stack focused on performance and scalability:
+CIFRAA is built using a modern frontend stack focused on performance and scalability:
 
 - **React** – UI framework  
 - **TypeScript** – Type-safe development  
@@ -44,10 +44,10 @@ Make sure you have:
 ## Installation
 
 - Clone the repository
-git clone https://github.com/10Vedansh/Fundex-app.git
+git clone https://github.com/10Vedansh/CIFRAA-app.git
 
 - Navigate into the project directory
-cd Fundex-app
+cd CIFRAA-app
 
 - Install dependencies
 npm install
@@ -74,7 +74,7 @@ npm run preview
 
 ## 🌐 Deployment
 
-FUNDEX is a frontend-only application and can be deployed easily on:
+CIFRAA is a frontend-only application and can be deployed easily on:
 
 -**Netlify**
 
@@ -90,7 +90,7 @@ Example (Netlify)
 ---
 
 ## 📌 Project Vision
-### FUNDEX is built with extensibility in mind. Planned enhancements include:
+### CIFRAA is built with extensibility in mind. Planned enhancements include:
 
 -🔁 **Advanced fund comparison tools**
 
