@@ -1,12 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles } from 'lucide-react';
+import { Send, User, Sparkles, MessageSquare, Plus, ArrowLeft, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: Date;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
@@ -18,23 +26,41 @@ const SUGGESTIONS = [
   "Explain Sharpe Ratio and why it matters",
 ];
 
+function AuctusIcon({ className }: { className?: string }) {
+  return (
+    <div className={cn("rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center", className)}>
+      <Zap className="h-4 w-4 text-primary" />
+    </div>
+  );
+}
+
 function ThinkingIndicator() {
   return (
     <div className="flex gap-3">
-      <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-        <Bot className="h-4 w-4 text-primary" />
-      </div>
+      <AuctusIcon className="h-8 w-8 flex-shrink-0" />
       <div className="bg-secondary/60 rounded-2xl px-4 py-3 flex items-center gap-1.5">
         <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
         <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
         <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
-        <span className="text-xs text-muted-foreground ml-2">Thinking...</span>
+        <span className="text-xs text-muted-foreground ml-2">Auctus is thinking...</span>
       </div>
     </div>
   );
 }
 
 export function AIChat() {
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('cifraa_chat_sessions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((s: any) => ({ ...s, createdAt: new Date(s.createdAt) }));
+      }
+    } catch {}
+    return [];
+  });
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,12 +68,54 @@ export function AIChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Save sessions to sessionStorage
+  useEffect(() => {
+    if (sessions.length > 0) {
+      sessionStorage.setItem('cifraa_chat_sessions', JSON.stringify(sessions));
+    }
+  }, [sessions]);
+
+  // Sync messages back to session
+  useEffect(() => {
+    if (activeSessionId && messages.length > 0 && !isLoading) {
+      setSessions(prev => prev.map(s =>
+        s.id === activeSessionId ? { ...s, messages } : s
+      ));
+    }
+  }, [messages, isLoading, activeSessionId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  const createNewSession = () => {
+    const id = crypto.randomUUID();
+    setActiveSessionId(id);
+    setMessages([]);
+    setShowHistory(false);
+  };
+
+  const loadSession = (session: ChatSession) => {
+    setActiveSessionId(session.id);
+    setMessages(session.messages);
+    setShowHistory(false);
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
+
+    let sessionId = activeSessionId;
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      setActiveSessionId(sessionId);
+      const newSession: ChatSession = {
+        id: sessionId,
+        title: text.trim().slice(0, 50),
+        messages: [],
+        createdAt: new Date(),
+      };
+      setSessions(prev => [newSession, ...prev]);
+    }
 
     const userMsg: Message = { role: 'user', content: text.trim() };
     const allMessages = [...messages, userMsg];
@@ -59,11 +127,17 @@ export function AIChat() {
     let assistantSoFar = '';
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        throw new Error('Please log in to use Auctus.');
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
@@ -150,6 +224,12 @@ export function AIChat() {
           } catch { /* ignore */ }
         }
       }
+
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId && s.title === text.trim().slice(0, 50)
+          ? { ...s, title: text.trim().slice(0, 50) }
+          : s
+      ));
     } catch (e: any) {
       setMessages((prev) => [
         ...prev,
@@ -166,18 +246,72 @@ export function AIChat() {
     sendMessage(input);
   };
 
+  // History view
+  if (showHistory) {
+    return (
+      <div className="animate-fade-in flex flex-col min-h-[60vh] px-4">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h2 className="text-xl font-bold text-foreground">Previous Chats</h2>
+          </div>
+          <Button variant="outline" size="sm" onClick={createNewSession} className="gap-2">
+            <Plus className="h-3.5 w-3.5" />
+            New Chat
+          </Button>
+        </div>
+        {sessions.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-muted-foreground">No previous chats yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map(s => (
+              <button
+                key={s.id}
+                onClick={() => loadSession(s)}
+                className={cn(
+                  "w-full text-left p-4 rounded-xl border transition-all",
+                  s.id === activeSessionId
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border/40 bg-card/50 hover:bg-primary/5 hover:border-primary/30"
+                )}
+              >
+                <p className="font-medium text-sm text-foreground truncate">{s.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {s.messages.length} messages • {s.createdAt.toLocaleDateString()}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Initial empty state
-  if (messages.length === 0) {
+  if (messages.length === 0 && !activeSessionId) {
     return (
       <div className="animate-fade-in flex flex-col items-center justify-center min-h-[60vh] px-4">
+        <div className="w-full max-w-2xl flex justify-end mb-4">
+          {sessions.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setShowHistory(true)} className="gap-2">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Previous Chats ({sessions.length})
+            </Button>
+          )}
+        </div>
         <div className="flex items-center gap-3 mb-4">
-          <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center">
-            <Sparkles className="h-6 w-6 text-primary" />
+          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
+            <Zap className="h-7 w-7 text-primary" />
           </div>
         </div>
-        <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-2">
-          All Your Answers, One Place
+        <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-1">
+          Auctus
         </h2>
+        <p className="text-sm text-primary/70 font-medium mb-2">Your Financial Intelligence</p>
         <p className="text-muted-foreground text-center mb-8 max-w-md">
           Ask anything about mutual funds — returns, comparisons, strategies, and more.
         </p>
@@ -189,7 +323,7 @@ export function AIChat() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about mutual funds..."
+              placeholder="Ask Auctus about mutual funds..."
               className="w-full h-14 pl-5 pr-14 rounded-2xl bg-secondary/60 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 text-base"
             />
             <Button
@@ -221,6 +355,30 @@ export function AIChat() {
   // Chat view
   return (
     <div className="animate-fade-in flex flex-col h-[calc(100vh-200px)] max-h-[700px]">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-border/40 mb-4">
+        <div className="flex items-center gap-2">
+          <AuctusIcon className="h-6 w-6" />
+          <span className="text-sm font-semibold text-primary">Auctus</span>
+          <span className="text-xs text-muted-foreground">•</span>
+          <span className="text-sm text-muted-foreground truncate max-w-[180px]">
+            {sessions.find(s => s.id === activeSessionId)?.title || 'New Chat'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {sessions.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(true)} className="gap-1.5 text-xs">
+              <MessageSquare className="h-3.5 w-3.5" />
+              History
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={createNewSession} className="gap-1.5 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            New
+          </Button>
+        </div>
+      </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-4 pb-4 pr-2">
         {messages.map((msg, i) => (
@@ -232,9 +390,7 @@ export function AIChat() {
             )}
           >
             {msg.role === 'assistant' && (
-              <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0 mt-1">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
+              <AuctusIcon className="h-8 w-8 flex-shrink-0 mt-1" />
             )}
             <div
               className={cn(
@@ -247,7 +403,6 @@ export function AIChat() {
               {msg.role === 'assistant' ? (
                 <div className="prose prose-sm prose-invert max-w-none [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2 [&>h1]:text-base [&>h2]:text-sm [&>h3]:text-sm">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  {/* Show blinking cursor while streaming this message */}
                   {isStreaming && i === messages.length - 1 && (
                     <span className="inline-block w-1.5 h-4 bg-primary/70 animate-pulse ml-0.5 align-middle" />
                   )}
@@ -263,7 +418,6 @@ export function AIChat() {
             )}
           </div>
         ))}
-        {/* Thinking indicator - shows before first token arrives */}
         {isLoading && !isStreaming && <ThinkingIndicator />}
         <div ref={messagesEndRef} />
       </div>
@@ -275,7 +429,7 @@ export function AIChat() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a follow-up..."
+            placeholder="Ask Auctus a follow-up..."
             disabled={isLoading}
             className="w-full h-12 pl-4 pr-14 rounded-xl bg-secondary/50 border border-border/40 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
           />

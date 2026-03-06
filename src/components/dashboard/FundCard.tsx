@@ -2,28 +2,19 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MutualFund, CATEGORY_LABELS } from '@/types/mutualFund';
-import { TrendingUp, TrendingDown, BarChart3, Percent, Bookmark } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, Percent, Bookmark, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FundCardProps {
-  fund: MutualFund;
+  fund: MutualFund & {
+    downsideRisk?: 'low' | 'moderate' | 'high';
+    suitabilityBadge?: 'aligned' | 'adjusted' | 'limited';
+    reasons?: string[];
+  };
   onClick?: () => void;
   isBookmarked?: boolean;
   onBookmarkToggle?: (fund: MutualFund) => void;
 }
-
-const getStrengthColor = (badge: string) => {
-  switch (badge) {
-    case 'Strong':
-      return 'bg-success/20 text-success border-success/30';
-    case 'Balanced':
-      return 'bg-warning/20 text-warning border-warning/30';
-    case 'Risky':
-      return 'bg-destructive/20 text-destructive border-destructive/30';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
-};
 
 const getCategoryColor = (category: string) => {
   const cat = category.toUpperCase();
@@ -62,9 +53,6 @@ function fmtVal(val: number | null | undefined, decimals = 1, suffix = ''): stri
 }
 
 export function FundCard({ fund, onClick, isBookmarked = false, onBookmarkToggle }: FundCardProps) {
-  const isPositiveReturn = (fund.cagr1Y ?? 0) >= 0;
-  const hasReturn = fund.cagr1Y !== null && fund.cagr1Y !== undefined;
-
   const handleBookmarkClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onBookmarkToggle?.(fund);
@@ -100,9 +88,6 @@ export function FundCard({ fund, onClick, isBookmarked = false, onBookmarkToggle
             <Badge variant="outline" className={cn(getCategoryColor(fund.category), "text-xs px-2.5 py-0.5")}>
               {getDisplayCategory(fund.category)}
             </Badge>
-            <Badge variant="outline" className={cn(getStrengthColor(fund.strengthBadge), "text-xs px-2.5 py-0.5")}>
-              {fund.strengthBadge}
-            </Badge>
           </div>
           <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors line-clamp-2 pr-12 leading-snug">
             {fund.name}
@@ -116,23 +101,27 @@ export function FundCard({ fund, onClick, isBookmarked = false, onBookmarkToggle
 
       <CardContent className="pt-0 px-5 pb-5">
         <div className="grid grid-cols-2 gap-5 mt-4">
-          {/* CAGR */}
+          {/* 3Y CAGR (primary) */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              {hasReturn ? (
-                isPositiveReturn ? (
+              {(fund.ret3Y ?? fund.cagr3Y) !== null && (fund.ret3Y ?? fund.cagr3Y) !== undefined ? (
+                (fund.ret3Y ?? fund.cagr3Y)! >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-success" />
                 ) : (
                   <TrendingDown className="h-4 w-4 text-destructive" />
                 )
               ) : null}
-              <span>1Y CAGR</span>
+              <span>3Y CAGR</span>
             </div>
             <p className={cn(
               "text-xl font-bold",
-              !hasReturn ? "text-muted-foreground" : isPositiveReturn ? "text-success" : "text-destructive"
+              (fund.ret3Y ?? fund.cagr3Y) === null || (fund.ret3Y ?? fund.cagr3Y) === undefined
+                ? "text-muted-foreground"
+                : (fund.ret3Y ?? fund.cagr3Y)! >= 0 ? "text-success" : "text-destructive"
             )}>
-              {hasReturn ? `${isPositiveReturn ? '+' : ''}${fund.cagr1Y!.toFixed(1)}%` : 'NA'}
+              {(fund.ret3Y ?? fund.cagr3Y) !== null && (fund.ret3Y ?? fund.cagr3Y) !== undefined
+                ? `${(fund.ret3Y ?? fund.cagr3Y)! >= 0 ? '+' : ''}${(fund.ret3Y ?? fund.cagr3Y)!.toFixed(1)}%`
+                : 'NA'}
             </p>
           </div>
 
@@ -174,6 +163,24 @@ export function FundCard({ fund, onClick, isBookmarked = false, onBookmarkToggle
           <span>NAV: {fund.nav ? `₹${fund.nav.toFixed(2)}` : 'NA'}</span>
           <span>AUM: {fund.aum ? `₹${fund.aum.toLocaleString()}Cr` : 'NA'}</span>
         </div>
+
+        {/* Why this fund? — Redesigned */}
+        {fund.reasons && fund.reasons.length > 0 && (
+          <div className="mt-4 p-3 rounded-xl bg-primary/5 border border-primary/10">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Lightbulb className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-semibold text-primary">Why this fund?</span>
+            </div>
+            <ul className="space-y-1">
+              {fund.reasons.slice(0, 3).map((r, i) => (
+                <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <span className="text-primary/60 mt-0.5">•</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
