@@ -235,7 +235,6 @@ function EarthGlobe() {
   );
 }
 
-// ─── Orbital Ring (unchanged) ─────────────────────────────────────
 
 function OrbitalRing() {
   const ringRef = useRef<THREE.Mesh>(null);
