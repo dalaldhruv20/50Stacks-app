@@ -22,6 +22,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface DashboardHeaderProps {
   onRefresh?: () => void;
   isLoading?: boolean;
+  /** Kept for backwards compatibility — no longer used in header UI. */
+  onOpenAuctus?: () => void;
 }
 
 export function DashboardHeader({ onRefresh, isLoading }: DashboardHeaderProps) {
@@ -50,24 +52,24 @@ export function DashboardHeader({ onRefresh, isLoading }: DashboardHeaderProps) 
   return (
     <>
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-2 lg:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-8">
-              {/* Logo - navigates to dashboard when authenticated */}
+              {/* Logo - smaller on mobile, full size on desktop */}
               <Link to="/dashboard" className="flex items-center">
-                <FundexLogo size="md" className="!h-20" />
+                <FundexLogo size="md" className="!h-12 lg:!h-20" />
               </Link>
             </div>
             
             <div className="flex items-center gap-3">
-              {/* FAQ Button */}
+              {/* FAQ Button (desktop only) */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-11 w-11 rounded-full"
+                      className="hidden lg:inline-flex h-11 w-11 rounded-full"
                       onClick={() => setIsFAQModalOpen(true)}
                     >
                       <HelpCircle className="h-5 w-5 text-muted-foreground" />
@@ -79,9 +81,9 @@ export function DashboardHeader({ onRefresh, isLoading }: DashboardHeaderProps) 
                 </Tooltip>
               </TooltipProvider>
 
-              {/* Notifications Button */}
+              {/* Notifications Button (desktop only) */}
               <NotificationsPopover>
-                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-full relative">
+                <Button variant="ghost" size="icon" className="hidden lg:inline-flex h-11 w-11 rounded-full relative">
                   <Bell className="h-5 w-5 text-muted-foreground" />
                   {unreadCount > 0 && (
                     <span className="absolute top-2 right-2 h-2 w-2 bg-primary rounded-full" />
@@ -92,10 +94,10 @@ export function DashboardHeader({ onRefresh, isLoading }: DashboardHeaderProps) 
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-11 w-11 rounded-full">
-                      <Avatar className="h-11 w-11">
+                    <Button variant="ghost" className="relative h-9 w-9 lg:h-11 lg:w-11 rounded-full">
+                      <Avatar className="h-9 w-9 lg:h-11 lg:w-11">
                         <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name || 'User'} />
-                        <AvatarFallback className="bg-primary/10 text-primary text-base font-semibold">
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm lg:text-base font-semibold">
                           {getInitials()}
                         </AvatarFallback>
                       </Avatar>
