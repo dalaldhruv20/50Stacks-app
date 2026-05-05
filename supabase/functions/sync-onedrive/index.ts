@@ -7,16 +7,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// OneDrive sharing link - convert to direct download URL
-const ONEDRIVE_SHARE_URL = "https://onedrive.live.com/:x:/g/personal/eaad892ddfe43dbc/IQAwlg5rDGisRZOQbwrUPfpFATcTWWB32t_7kwEeARQZJz0?rtime=a6MilE2P3kg&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy9lYWFkODkyZGRmZTQzZGJjL0lRQXdsZzVyREdpc1JaT1Fid3JVUGZwRkFUY1RXV0IzMnRfN2t3RWVBUlFaSnowP2U9dGZDMWtD";
+// OneDrive sharing link - we use the short 1drv.ms form which works reliably with the shares API.
+// The original onedrive.live.com URL embeds this short URL inside its `redeem` (base64) parameter.
+const ONEDRIVE_SHARE_URL = "https://1drv.ms/x/c/eaad892ddfe43dbc/IQAwlg5rDGisRZOQbwrUPfpFATcTWWB32t_7kwEeARQZJz0?e=O1pceH";
 
 function getOneDriveDownloadUrl(shareUrl: string): string {
-  // Method: Convert sharing URL to base64, then use OneDrive API
+  // Encode per Microsoft "shares" rules: base64 -> url-safe -> strip padding -> prefix "u!"
   const base64 = btoa(shareUrl)
+    .replace(/=+$/, '')
     .replace(/\//g, '_')
-    .replace(/\+/g, '-')
-    .replace(/=+$/, '');
+    .replace(/\+/g, '-');
   const encodedUrl = `u!${base64}`;
+  // api.onedrive.com works anonymously for personal shared links (Graph requires auth and returns 401)
   return `https://api.onedrive.com/v1.0/shares/${encodedUrl}/root/content`;
 }
 
@@ -70,6 +72,17 @@ function parseNumber(val: unknown): number | null {
 
 function parseExitLoad(val: unknown): string {
   if (!val || val === '--' || val === '-') return 'Nil';
+  return String(val).trim();
+}
+
+function parseLaunchDate(val: unknown): string | null {
+  if (val === null || val === undefined || val === '' || val === '--' || val === '-' || val === 'N/A') return null;
+  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().slice(0, 10);
+  const str = String(val).replace(/,/g, '').trim();
+  const serial = Number(str);
+  if (Number.isFinite(serial) && serial > 59 && serial < 80000) {
+    return new Date(Date.UTC(1899, 11, 30) + serial * 86400000).toISOString().slice(0, 10);
+  }
   return String(val).trim();
 }
 
@@ -134,7 +147,7 @@ function processSheet(worksheet: XLSX.WorkSheet, colMapping: string[], assetClas
 
       if (key === 'name') fund.name = String(val).trim();
       else if (key === 'category') fund.category = String(val).trim();
-      else if (key === 'launch') fund.launch = val ? String(val).trim() : null;
+      else if (key === 'launch') fund.launch = parseLaunchDate(val);
       else if (key === 'fundManager') fund.fundManager = val ? String(val).trim() : null;
       else if (key === 'exitLoad') fund.exitLoad = parseExitLoad(val);
       else if (key === 'avgCreditQuality') fund.avgCreditQuality = val ? String(val).trim() : null;
